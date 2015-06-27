@@ -60,21 +60,12 @@ public class HTTP2Sampler extends AbstractSampler {
     {
         log.debug("sample()");
 
-        SampleResult sampleResult = new SampleResult();
-        sampleResult.setSampleLabel(getName());
-
-        // Start sampling
-        sampleResult.sampleStart();
-
         // Send H2 request
         NettyHttp2Client client = new NettyHttp2Client(getMethod(), getDomain(), getPort(), getPath());
-        client.request();
+        SampleResult res = client.request();
+        res.setSampleLabel(getName());
 
-        // End sampling
-        sampleResult.sampleEnd();
-        sampleResult.setSuccessful(true);
-
-        return sampleResult;
+        return res;
     }
 
     public void setMethod(String value) {
