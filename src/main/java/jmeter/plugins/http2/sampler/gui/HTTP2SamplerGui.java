@@ -72,7 +72,6 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
     public TestElement createTestElement() {
         HTTP2Sampler sampler = new HTTP2Sampler();
 
-        /* configureTestElement(sampler); */
         modifyTestElement(sampler);
 
         return sampler;
@@ -81,10 +80,12 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
     @Override
     public void configure(TestElement element) {
         super.configure(element);
-        element.getProperty(HTTP2Sampler.METHOD);
-        element.getProperty(HTTP2Sampler.DOMAIN);
-        element.getProperty(HTTP2Sampler.PORT);
-        element.getProperty(HTTP2Sampler.PATH);
+
+        HTTP2Sampler sampler = (HTTP2Sampler)element;
+        /* method.setText(sampler.getMethod()); */
+        domain.setText(sampler.getDomain());
+        port.setText(String.valueOf(sampler.getPort()));
+        path.setText(sampler.getPath());
     }
 
     @Override

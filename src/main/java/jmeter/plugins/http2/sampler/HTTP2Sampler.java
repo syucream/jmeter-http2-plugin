@@ -72,7 +72,7 @@ public class HTTP2Sampler extends AbstractSampler {
       setProperty(METHOD, value);
     }
 
-    private String getMethod() {
+    public String getMethod() {
       return getPropertyAsString(METHOD);
     }
 
@@ -80,7 +80,7 @@ public class HTTP2Sampler extends AbstractSampler {
       setProperty(DOMAIN, value);
     }
 
-    private String getDomain() {
+    public String getDomain() {
       return getPropertyAsString(DOMAIN);
     }
 
@@ -88,7 +88,7 @@ public class HTTP2Sampler extends AbstractSampler {
       setProperty(PORT, value);
     }
 
-    private int getPort() {
+    public int getPort() {
       return getPropertyAsInt(PORT);
     }
 
@@ -96,7 +96,7 @@ public class HTTP2Sampler extends AbstractSampler {
       setProperty(PATH, value);
     }
 
-    private String getPath() {
+    public String getPath() {
       return getPropertyAsString(PATH);
     }
 }
