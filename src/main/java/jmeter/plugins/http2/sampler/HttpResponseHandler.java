@@ -38,9 +38,11 @@ import java.util.concurrent.TimeUnit;
 public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
     private SortedMap<Integer, ChannelPromise> streamidPromiseMap;
+    private SortedMap<Integer, FullHttpResponse> streamidResponseMap;
 
     public HttpResponseHandler() {
         streamidPromiseMap = new TreeMap<Integer, ChannelPromise>();
+        streamidResponseMap = new TreeMap<Integer, FullHttpResponse>();
     }
 
     /**
@@ -62,8 +64,9 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
      * @param unit Units associated with {@code timeout}
      * @see HttpResponseHandler#put(int, ChannelPromise)
      */
-    public void awaitResponses(long timeout, TimeUnit unit) {
+    public SortedMap<Integer, FullHttpResponse> awaitResponses(long timeout, TimeUnit unit) {
         Iterator<Entry<Integer, ChannelPromise>> itr = streamidPromiseMap.entrySet().iterator();
+
         while (itr.hasNext()) {
             Entry<Integer, ChannelPromise> entry = itr.next();
             ChannelPromise promise = entry.getValue();
@@ -76,6 +79,8 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
             System.out.println("---Stream id: " + entry.getKey() + " received---");
             itr.remove();
         }
+
+        return streamidResponseMap;
     }
 
     @Override
@@ -100,6 +105,9 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
             }
 
             promise.setSuccess();
+
+            // Set result
+            streamidResponseMap.put(streamId, msg);
         }
     }
 }

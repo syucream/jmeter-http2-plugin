@@ -16,7 +16,11 @@
 package jmeter.plugins.http2.sampler;
 
 import java.net.URI;
+import java.net.URL;
+import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.SortedMap;
 
 import javax.net.ssl.SSLException;
 
@@ -31,10 +35,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.util.CharsetUtil;
+import io.netty.util.AsciiString;
 
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
@@ -101,8 +106,16 @@ public class NettyHttp2Client {
         }
 
         HttpResponseHandler responseHandler = initializer.responseHandler();
-        int streamId = 3;
-        URI hostName = URI.create("https://" + host + ':' + port);
+        final int streamId = 3;
+        final URI hostName = URI.create("https://" + host + ':' + port);
+
+        // Set attributes to SampleResult
+        try {
+            sampleResult.setURL(new URL("https", host, port, path));
+        } catch (MalformedURLException exception) {
+            sampleResult.setSuccessful(false);
+            return sampleResult;
+        }
 
         FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, GET, path);
         request.headers().addObject(HttpHeaderNames.HOST, hostName);
@@ -111,8 +124,16 @@ public class NettyHttp2Client {
         channel.writeAndFlush(request);
         responseHandler.put(streamId, channel.newPromise());
 
+        final SortedMap<Integer, FullHttpResponse> responseMap;
         try {
-            responseHandler.awaitResponses(5, TimeUnit.SECONDS);
+            responseMap = responseHandler.awaitResponses(5, TimeUnit.SECONDS);
+
+            // Currently pick up only one response of a stream
+            final FullHttpResponse response = responseMap.get(streamId);
+            final AsciiString responseCode = response.status().codeAsText();
+            final AsciiString reasonPhrase = response.status().reasonPhrase();
+            sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
+            sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
         } catch(Exception exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
