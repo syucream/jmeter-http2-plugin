@@ -122,8 +122,7 @@ public class NettyHttp2Client {
               Protocol.ALPN,
               SelectorFailureBehavior.NO_ADVERTISE,
               SelectedListenerFailureBehavior.ACCEPT,
-              ApplicationProtocolNames.HTTP_2,
-              ApplicationProtocolNames.HTTP_1_1))
+              ApplicationProtocolNames.HTTP_2))
           .build();
     } catch(SSLException exception) {
     }
