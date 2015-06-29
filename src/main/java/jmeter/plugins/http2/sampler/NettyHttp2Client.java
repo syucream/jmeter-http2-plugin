@@ -111,7 +111,7 @@ public class NettyHttp2Client {
 
         // Set attributes to SampleResult
         try {
-            sampleResult.setURL(new URL("https", host, port, path));
+            sampleResult.setURL(new URL(hostName.toString()));
         } catch (MalformedURLException exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
