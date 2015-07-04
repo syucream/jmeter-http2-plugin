@@ -13,6 +13,8 @@ Jmeter HTTP/2 sampler
 
 2. Copy HTTP2Sampler.jar, netty-all.jar, netty-tcnative.jar and hpack.jar to lib/ext of jmeter directory
 
+  * If you use gzip encoding, you must prepare jzlib.jar too.
+
 3. Run JMeter
 
 4. Write your test scenario with HTTP2Sampler
