@@ -20,10 +20,12 @@ package jmeter.plugins.http2.sampler;
 
 import static io.netty.handler.logging.LogLevel.INFO;
 
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
@@ -36,11 +38,13 @@ import io.netty.handler.codec.http2.DefaultHttp2FrameWriter;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2FrameReader;
 import io.netty.handler.codec.http2.Http2FrameWriter;
 import io.netty.handler.codec.http2.Http2InboundFrameLogger;
 import io.netty.handler.codec.http2.Http2OutboundFrameLogger;
+import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapter;
 import io.netty.handler.ssl.SslContext;
@@ -53,7 +57,8 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
 
     private final SslContext sslCtx;
     private final int maxContentLength;
-    private HttpToHttp2ConnectionHandler connectionHandler;
+    /* private HttpToHttp2ConnectionHandler connectionHandler; */
+    private Http2ConnectionHandler connectionHandler;
     private HttpResponseHandler responseHandler;
     private Http2SettingsHandler settingsHandler;
 
@@ -65,10 +70,10 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     public void initChannel(SocketChannel ch) throws Exception {
         final Http2Connection connection = new DefaultHttp2Connection(false);
-        final Http2FrameWriter frameWriter = frameWriter();
+
         connectionHandler = new HttpToHttp2ConnectionHandler(connection,
                 frameReader(),
-                frameWriter,
+                frameWriter(),
                 new DelegatingDecompressorFrameListener(connection,
                         new InboundHttp2ToHttpAdapter.Builder(connection)
                                 .maxContentLength(maxContentLength)
@@ -150,11 +155,39 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
         }
     }
 
-    private static Http2FrameReader frameReader() {
+    private Http2FrameReader frameReader() {
         return new Http2InboundFrameLogger(new DefaultHttp2FrameReader(), logger);
     }
 
-    private static Http2FrameWriter frameWriter() {
-        return new Http2OutboundFrameLogger(new DefaultHttp2FrameWriter(), logger);
+    private Http2FrameWriter frameWriter() {
+        // Set initial SETTINGS
+        Http2Settings settings = new Http2Settings();
+        settings.pushEnabled(false);
+        settings.maxConcurrentStreams(100);
+
+        return new Http2OutboundFrameLogger(new CustomHttp2FrameWriter(settings), logger);
+    }
+
+    /**
+     *  Custom HTTP/2 frame writer.
+     */
+    private class CustomHttp2FrameWriter extends DefaultHttp2FrameWriter {
+        private final Http2Settings settings;
+
+        public CustomHttp2FrameWriter(Http2Settings settings) {
+            this.settings = settings;
+        }
+
+        /**
+         *  write customized SETTINGS
+         */
+        @Override
+        public ChannelFuture writeSettings(ChannelHandlerContext ctx, Http2Settings settings, ChannelPromise promise) {
+            if(this.settings != null) {
+                return super.writeSettings(ctx, this.settings, promise);
+            } else {
+                return super.writeSettings(ctx, settings, promise);
+            }
+        }
     }
 }
