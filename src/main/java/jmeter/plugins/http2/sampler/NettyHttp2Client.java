@@ -133,9 +133,11 @@ public class NettyHttp2Client {
             CollectionProperty headers = headerManager.getHeaders();
             if (headers != null) {
                 PropertyIterator i = headers.iterator();
-                org.apache.jmeter.protocol.http.control.Header header
-                    = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
-                request.headers().add(header.getName(), header.getValue());
+                while (i.hasNext()) {
+                    org.apache.jmeter.protocol.http.control.Header header
+                        = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
+                    request.headers().add(header.getName(), header.getValue());
+                }
             }
         }
 
