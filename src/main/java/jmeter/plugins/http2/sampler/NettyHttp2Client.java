@@ -21,6 +21,8 @@ import java.net.MalformedURLException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.SortedMap;
+import java.util.Iterator;
+import java.util.Map.Entry;
 
 import javax.net.ssl.SSLException;
 
@@ -134,6 +136,7 @@ public class NettyHttp2Client {
             final AsciiString reasonPhrase = response.status().reasonPhrase();
             sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
             sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
+            sampleResult.setResponseHeaders(getResponseHeaders(response));
         } catch(Exception exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
@@ -170,5 +173,23 @@ public class NettyHttp2Client {
         }
 
         return sslCtx;
+    }
+
+    /**
+     * Convert Response headers set by Netty stack to one String instance
+     */
+    private String getResponseHeaders(FullHttpResponse response) {
+        StringBuilder headerBuf = new StringBuilder();
+
+        Iterator<Entry<String, String>> iterator = response.headers().iteratorConverted();
+        while(iterator.hasNext()) {
+            Entry<String, String> entry = iterator.next();
+            headerBuf.append(entry.getKey());
+            headerBuf.append(": ");
+            headerBuf.append(entry.getValue());
+            headerBuf.append("\n");
+        }
+
+        return headerBuf.toString();
     }
 }
