@@ -26,7 +26,11 @@ import java.util.Map.Entry;
 
 import javax.net.ssl.SSLException;
 
+import org.apache.jmeter.protocol.http.control.Header;
+import org.apache.jmeter.protocol.http.control.HeaderManager;
 import org.apache.jmeter.samplers.SampleResult;
+import org.apache.jmeter.testelement.property.CollectionProperty;
+import org.apache.jmeter.testelement.property.PropertyIterator;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
@@ -63,14 +67,16 @@ public class NettyHttp2Client {
     private final String host;
     private final int port;
     private final String path;
+    private final HeaderManager headerManager;
 
     private Bootstrap b;
 
-    public NettyHttp2Client(String method, String host, int port, String path) {
+    public NettyHttp2Client(String method, String host, int port, String path, HeaderManager headerManager) {
         this.method = method;
         this.host = host;
         this.port = port;
         this.path = path;
+        this.headerManager = headerManager;
     }
 
     public SampleResult request() {
@@ -121,8 +127,18 @@ public class NettyHttp2Client {
 
         FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, GET, path);
         request.headers().addObject(HttpHeaderNames.HOST, hostName);
-        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
-        request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.DEFLATE);
+
+        // Add request headers set by HeaderManager
+        if (headerManager != null) {
+            CollectionProperty headers = headerManager.getHeaders();
+            if (headers != null) {
+                PropertyIterator i = headers.iterator();
+                org.apache.jmeter.protocol.http.control.Header header
+                    = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
+                request.headers().add(header.getName(), header.getValue());
+            }
+        }
+
         channel.writeAndFlush(request);
         responseHandler.put(streamId, channel.newPromise());
 

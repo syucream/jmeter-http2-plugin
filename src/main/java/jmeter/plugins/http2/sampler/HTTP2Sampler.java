@@ -19,6 +19,8 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.jmeter.protocol.http.control.HeaderManager;
+import org.apache.jmeter.protocol.http.sampler.HTTPSamplerBase;
 import org.apache.jmeter.samplers.AbstractSampler;
 import org.apache.jmeter.samplers.Entry;
 import org.apache.jmeter.samplers.SampleResult;
@@ -56,12 +58,29 @@ public class HTTP2Sampler extends AbstractSampler {
     }
 
     @Override
+    public void addTestElement(TestElement el) {
+        if (el instanceof HeaderManager) {
+            HeaderManager value = (HeaderManager) el;
+            HeaderManager currentHeaderManager = getHeaderManager();
+            if (currentHeaderManager != null) {
+                value = currentHeaderManager.merge(value, true);
+            }
+            setProperty(new TestElementProperty(HTTPSamplerBase.HEADER_MANAGER, value));
+        } else {
+            super.addTestElement(el);
+        }
+    }
+
+    @Override
     public SampleResult sample(Entry e)
     {
         log.debug("sample()");
 
+        // Load test elements
+        HeaderManager headerManager = (HeaderManager)getProperty(HTTPSamplerBase.HEADER_MANAGER).getObjectValue();
+
         // Send H2 request
-        NettyHttp2Client client = new NettyHttp2Client(getMethod(), getDomain(), getPort(), getPath());
+        NettyHttp2Client client = new NettyHttp2Client(getMethod(), getDomain(), getPort(), getPath(), headerManager);
         SampleResult res = client.request();
         res.setSampleLabel(getName());
 
@@ -98,6 +117,10 @@ public class HTTP2Sampler extends AbstractSampler {
 
     public String getPath() {
       return getPropertyAsString(PATH);
+    }
+
+    private HeaderManager getHeaderManager() {
+        return (HeaderManager)getProperty(HTTPSamplerBase.HEADER_MANAGER).getObjectValue();
     }
 }
 
