@@ -51,7 +51,7 @@
           <stringProp name="HTTP2Sampler.method">GET</stringProp>
           <stringProp name="HTTP2Sampler.domain">127.0.0.1</stringProp>
           <stringProp name="HTTP2Sampler.port">4430</stringProp>
-          <stringProp name="TTP2Sampler.host">/</stringProp>
+          <stringProp name="HTTP2Sampler.path">/</stringProp>
         </jmeter.plugins.http2.sampler.HTTP2Sampler>
         <hashTree>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Is the response code OK?" enabled="true">

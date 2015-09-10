@@ -36,7 +36,7 @@ public class HTTP2Sampler extends AbstractSampler {
     public static final String METHOD = "HTTP2Sampler.method";
     public static final String DOMAIN = "HTTP2Sampler.domain";
     public static final String PORT = "HTTP2Sampler.port";
-    public static final String PATH = "TTP2Sampler.host";
+    public static final String PATH = "HTTP2Sampler.path";
 
     public static final String DEFAULT_METHOD = "GET";
 
