@@ -15,25 +15,7 @@
  */
 package jmeter.plugins.http2.sampler;
 
-import java.net.URI;
-import java.net.URL;
-import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
-import java.util.SortedMap;
-import java.util.Iterator;
-import java.util.Map.Entry;
-
-import javax.net.ssl.SSLException;
-
-import org.apache.jmeter.protocol.http.control.Header;
-import org.apache.jmeter.protocol.http.control.HeaderManager;
-import org.apache.jmeter.samplers.SampleResult;
-import org.apache.jmeter.testelement.property.CollectionProperty;
-import org.apache.jmeter.testelement.property.PropertyIterator;
-
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -43,10 +25,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.util.AsciiString;
-
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
 import io.netty.handler.ssl.ApplicationProtocolConfig.SelectedListenerFailureBehavior;
@@ -58,9 +37,23 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.util.AsciiString;
+import org.apache.jmeter.protocol.http.control.HeaderManager;
+import org.apache.jmeter.samplers.SampleResult;
+import org.apache.jmeter.testelement.property.CollectionProperty;
+import org.apache.jmeter.testelement.property.PropertyIterator;
 
-import static io.netty.handler.codec.http.HttpMethod.*;
-import static io.netty.handler.codec.http.HttpVersion.*;
+import javax.net.ssl.SSLException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.SortedMap;
+import java.util.concurrent.TimeUnit;
+
+import static io.netty.handler.codec.http.HttpMethod.GET;
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class NettyHttp2Client {
     private final String method;
@@ -199,7 +192,7 @@ public class NettyHttp2Client {
     private String getResponseHeaders(FullHttpResponse response) {
         StringBuilder headerBuf = new StringBuilder();
 
-        Iterator<Entry<String, String>> iterator = response.headers().iteratorConverted();
+        Iterator<Entry<String, String>> iterator = response.headers().iteratorAsString();
         while(iterator.hasNext()) {
             Entry<String, String> entry = iterator.next();
             headerBuf.append(entry.getKey());

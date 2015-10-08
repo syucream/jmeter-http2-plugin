@@ -18,8 +18,6 @@
  */
 package jmeter.plugins.http2.sampler;
 
-import static io.netty.handler.logging.LogLevel.INFO;
-
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,11 +31,15 @@ import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
+import io.netty.handler.codec.http2.DefaultHttp2ConnectionDecoder;
+import io.netty.handler.codec.http2.DefaultHttp2ConnectionEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2FrameReader;
 import io.netty.handler.codec.http2.DefaultHttp2FrameWriter;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2ConnectionDecoder;
+import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2FrameReader;
@@ -47,7 +49,10 @@ import io.netty.handler.codec.http2.Http2OutboundFrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapter;
+import io.netty.handler.codec.http2.StreamBufferingEncoder;
 import io.netty.handler.ssl.SslContext;
+
+import static io.netty.handler.logging.LogLevel.INFO;
 
 /**
  * Configures the client pipeline to support HTTP/2 frames.
@@ -71,14 +76,35 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     public void initChannel(SocketChannel ch) throws Exception {
         final Http2Connection connection = new DefaultHttp2Connection(false);
 
-        connectionHandler = new HttpToHttp2ConnectionHandler(connection,
-                frameReader(),
-                frameWriter(),
-                new DelegatingDecompressorFrameListener(connection,
+        Http2ConnectionEncoder encoder = new DefaultHttp2ConnectionEncoder(connection, frameWriter());
+        encoder = new StreamBufferingEncoder(encoder, 100);
+        Http2ConnectionDecoder decoder = new DefaultHttp2ConnectionDecoder(connection, encoder, frameReader());
+
+        connectionHandler = new HttpToHttp2ConnectionHandler.Builder()
+                .frameListener(new DelegatingDecompressorFrameListener(connection,
                         new InboundHttp2ToHttpAdapter.Builder(connection)
                                 .maxContentLength(maxContentLength)
                                 .propagateSettings(true)
-                                .build()));
+                                .build()))
+                .build(decoder, encoder);
+
+
+//        // Set initial SETTINGS
+//        Http2Settings settings = new Http2Settings();
+//        settings.pushEnabled(false);
+//        settings.maxConcurrentStreams(100);
+//
+//        connectionHandler = new HttpToHttp2ConnectionHandler.Builder()
+//                .frameLogger(logger)
+//                .initialSettings(settings)
+//                .encoderMaxConcurrentStreams(100)
+//
+//                .frameListener(new DelegatingDecompressorFrameListener(connection,
+//                        new InboundHttp2ToHttpAdapter.Builder(connection)
+//                                .maxContentLength(maxContentLength)
+//                                .propagateSettings(true)
+//                                .build()))
+//                .build(connection);
         responseHandler = new HttpResponseHandler();
         settingsHandler = new Http2SettingsHandler(ch.newPromise());
         if (sslCtx != null) {
