@@ -43,7 +43,6 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.apache.jmeter.testelement.property.CollectionProperty;
 import org.apache.jmeter.testelement.property.PropertyIterator;
 
-import javax.net.ssl.SSLException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -51,6 +50,7 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLException;
 
 import static io.netty.handler.codec.http.HttpMethod.GET;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
@@ -119,7 +119,7 @@ public class NettyHttp2Client {
         }
 
         FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, GET, path);
-        request.headers().addObject(HttpHeaderNames.HOST, hostName);
+        request.headers().add(HttpHeaderNames.HOST, hostName);
 
         // Add request headers set by HeaderManager
         if (headerManager != null) {
@@ -144,7 +144,7 @@ public class NettyHttp2Client {
             // Currently pick up only one response of a stream
             final FullHttpResponse response = responseMap.get(streamId);
             final AsciiString responseCode = response.status().codeAsText();
-            final AsciiString reasonPhrase = response.status().reasonPhrase();
+            final String reasonPhrase = response.status().reasonPhrase();
             sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
             sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
             sampleResult.setResponseHeaders(getResponseHeaders(response));

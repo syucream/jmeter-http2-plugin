@@ -16,21 +16,15 @@
 package jmeter.plugins.http2.sampler.gui;
 
 import jmeter.plugins.http2.sampler.HTTP2Sampler;
-
-import java.awt.BorderLayout;
-import java.awt.Component;
-
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.BoxLayout;
-
 import org.apache.jmeter.gui.util.HorizontalPanel;
 import org.apache.jmeter.samplers.gui.AbstractSamplerGui;
 import org.apache.jmeter.testelement.TestElement;
 import org.apache.jorphan.gui.JLabeledChoice;
 import org.apache.jorphan.logging.LoggingManager;
 import org.apache.log.Logger;
+
+import java.awt.*;
+import javax.swing.*;
 
 public class HTTP2SamplerGui extends AbstractSamplerGui {
 
@@ -63,12 +57,10 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
         return "HTTP2 Sampler";
     }
 
-    @Override
     public String getLabelResource() {
         return "HTTP2 Sampler";
     }
 
-    @Override
     public TestElement createTestElement() {
         HTTP2Sampler sampler = new HTTP2Sampler();
 
@@ -88,7 +80,6 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
         path.setText(sampler.getPath());
     }
 
-    @Override
     public void modifyTestElement(TestElement element) {
         configureTestElement(element);
         /* element.setProperty(HTTP2Sampler.METHOD, method.getText()); */

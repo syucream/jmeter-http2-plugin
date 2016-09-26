@@ -4,7 +4,7 @@ Jmeter HTTP/2 sampler
 
 ## Dependencies
 
-* [Netty 5 and netty-tcnative](http://netty.io/)
+* [Netty 4.1.x and netty-tcnative](http://netty.io/)
 * [hpack](https://github.com/twitter/hpack)
 
 ## Quickstart

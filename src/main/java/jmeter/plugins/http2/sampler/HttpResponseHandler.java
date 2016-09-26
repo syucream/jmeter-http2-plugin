@@ -84,7 +84,7 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
     }
 
     @Override
-    protected void messageReceived(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
         Integer streamId = msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
         if (streamId == null) {
             System.err.println("HttpResponseHandler unexpected message received: " + msg);
@@ -101,6 +101,7 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
                 int contentLength = content.readableBytes();
                 byte[] arr = new byte[contentLength];
                 content.readBytes(arr);
+                //noinspection Since15
                 System.out.println(new String(arr, 0, contentLength, CharsetUtil.UTF_8));
             }
 
