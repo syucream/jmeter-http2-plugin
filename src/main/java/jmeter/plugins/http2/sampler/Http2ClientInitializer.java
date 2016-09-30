@@ -31,15 +31,11 @@ import io.netty.handler.codec.http.HttpClientUpgradeHandler;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.DefaultHttp2Connection;
-import io.netty.handler.codec.http2.DefaultHttp2ConnectionDecoder;
-import io.netty.handler.codec.http2.DefaultHttp2ConnectionEncoder;
 import io.netty.handler.codec.http2.DefaultHttp2FrameReader;
 import io.netty.handler.codec.http2.DefaultHttp2FrameWriter;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2Connection;
-import io.netty.handler.codec.http2.Http2ConnectionDecoder;
-import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2FrameReader;
@@ -49,7 +45,6 @@ import io.netty.handler.codec.http2.Http2OutboundFrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
-import io.netty.handler.codec.http2.StreamBufferingEncoder;
 import io.netty.handler.ssl.SslContext;
 
 import static io.netty.handler.logging.LogLevel.INFO;
@@ -76,18 +71,18 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     public void initChannel(SocketChannel ch) throws Exception {
         final Http2Connection connection = new DefaultHttp2Connection(false);
 
-        Http2ConnectionEncoder encoder = new DefaultHttp2ConnectionEncoder(connection, frameWriter());
-        encoder = new StreamBufferingEncoder(encoder, 100);
-        Http2ConnectionDecoder decoder = new DefaultHttp2ConnectionDecoder(connection, encoder, frameReader());
+//        Http2ConnectionEncoder encoder = new DefaultHttp2ConnectionEncoder(connection, frameWriter());
+//        encoder = new StreamBufferingEncoder(encoder, 100);
+//        Http2ConnectionDecoder decoder = new DefaultHttp2ConnectionDecoder(connection, encoder, frameReader());
 
         connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
-                .connection(connection)
-                .codec(decoder, encoder)
+//                .codec(decoder, encoder)
                 .frameListener(new DelegatingDecompressorFrameListener(connection,
                         new InboundHttp2ToHttpAdapterBuilder(connection)
                                 .maxContentLength(maxContentLength)
                                 .propagateSettings(true)
                                 .build()))
+                .connection(connection)
                 .build();
 
 
