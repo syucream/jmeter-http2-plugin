@@ -105,10 +105,11 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
                 System.out.println(new String(arr, 0, contentLength, CharsetUtil.UTF_8));
             }
 
-            promise.setSuccess();
-
             // Set result
             streamidResponseMap.put(streamId, msg);
+
+            promise.setSuccess();
+
         }
     }
 }
