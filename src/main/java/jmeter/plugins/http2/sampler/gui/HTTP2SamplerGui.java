@@ -31,6 +31,7 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
     private static final Logger log = LoggingManager.getLoggerForClass();
 
     private JLabeledChoice method;
+    private JTextField scheme;
     private JTextField domain;
     private JTextField port;
     private JTextField path;
@@ -75,6 +76,7 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
 
         HTTP2Sampler sampler = (HTTP2Sampler)element;
         /* method.setText(sampler.getMethod()); */
+        scheme.setText(sampler.getScheme());
         domain.setText(sampler.getDomain());
         port.setText(String.valueOf(sampler.getPort()));
         path.setText(sampler.getPath());
@@ -84,6 +86,7 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
         configureTestElement(element);
         /* element.setProperty(HTTP2Sampler.METHOD, method.getText()); */
         element.setProperty(HTTP2Sampler.METHOD, HTTP2Sampler.DEFAULT_METHOD);
+        element.setProperty(HTTP2Sampler.SCHEME, scheme.getText());
         element.setProperty(HTTP2Sampler.DOMAIN, domain.getText());
         element.setProperty(HTTP2Sampler.PORT, port.getText());
         element.setProperty(HTTP2Sampler.PATH, path.getText());
@@ -92,13 +95,28 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
     private final JPanel getWebServerPanel() {
         JPanel webServerPanel = new HorizontalPanel();
 
+        final JPanel schemePanel = getSchemePanel();
         final JPanel domainPanel = getDomainPanel();
         final JPanel portPanel = getPortPanel();
 
+        webServerPanel.add(schemePanel, BorderLayout.WEST);
         webServerPanel.add(domainPanel, BorderLayout.CENTER);
         webServerPanel.add(portPanel, BorderLayout.EAST);
 
         return webServerPanel;
+    }
+
+    private final JPanel getSchemePanel() {
+        scheme = new JTextField(10);
+
+        JLabel label = new JLabel("Scheme");
+        label.setLabelFor(scheme);
+
+        JPanel panel = new JPanel(new BorderLayout(5, 0));
+        panel.add(label, BorderLayout.WEST);
+        panel.add(scheme, BorderLayout.CENTER);
+
+        return panel;
     }
 
     private final JPanel getDomainPanel() {

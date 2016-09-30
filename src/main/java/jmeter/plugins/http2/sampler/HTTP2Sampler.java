@@ -30,6 +30,7 @@ public class HTTP2Sampler extends AbstractSampler {
     private static final Logger log = LoggingManager.getLoggerForClass();
 
     public static final String METHOD = "HTTP2Sampler.method";
+    public static final String SCHEME = "HTTP2Sampler.scheme";
     public static final String DOMAIN = "HTTP2Sampler.domain";
     public static final String PORT = "HTTP2Sampler.port";
     public static final String PATH = "HTTP2Sampler.path";
@@ -75,7 +76,7 @@ public class HTTP2Sampler extends AbstractSampler {
         HeaderManager headerManager = (HeaderManager)getProperty(HTTPSamplerBase.HEADER_MANAGER).getObjectValue();
 
         // Send H2 request
-        NettyHttp2Client client = new NettyHttp2Client(getMethod(), getDomain(), getPort(), getPath(), headerManager);
+        NettyHttp2Client client = new NettyHttp2Client(getMethod(), getDomain(), getPort(), getPath(), headerManager, getScheme());
         SampleResult res = client.request();
         res.setSampleLabel(getName());
 
@@ -88,6 +89,14 @@ public class HTTP2Sampler extends AbstractSampler {
 
     public String getMethod() {
       return getPropertyAsString(METHOD);
+    }
+
+    public void setScheme(String value) {
+        setProperty(SCHEME, value);
+    }
+
+    public String getScheme() {
+        return getPropertyAsString(SCHEME);
     }
 
     public void setDomain(String value) {

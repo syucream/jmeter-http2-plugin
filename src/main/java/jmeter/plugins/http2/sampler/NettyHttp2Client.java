@@ -25,6 +25,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
@@ -45,18 +46,17 @@ import org.apache.jmeter.testelement.property.PropertyIterator;
 
 import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URL;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 
-import static io.netty.handler.codec.http.HttpMethod.GET;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class NettyHttp2Client {
     private final String method;
+    private final String scheme;
     private final String host;
     private final int port;
     private final String path;
@@ -64,21 +64,25 @@ public class NettyHttp2Client {
 
     private Bootstrap b;
 
-    public NettyHttp2Client(String method, String host, int port, String path, HeaderManager headerManager) {
+    public NettyHttp2Client(String method, String host, int port, String path, HeaderManager headerManager, String scheme) {
         this.method = method;
         this.host = host;
         this.port = port;
         this.path = path;
         this.headerManager = headerManager;
+        this.scheme = scheme;
     }
 
     public SampleResult request() {
         SampleResult sampleResult = new SampleResult();
 
-        final SslContext sslCtx = getSslContext();
-        if (sslCtx == null) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
+        SslContext sslCtx = null;
+        if ("https".equals(scheme)) {
+            sslCtx = getSslContext();
+            if (sslCtx == null) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
         }
 
         // Configure the client.
@@ -101,24 +105,26 @@ public class NettyHttp2Client {
         Http2SettingsHandler http2SettingsHandler = initializer.settingsHandler();
         try {
             http2SettingsHandler.awaitSettings(5, TimeUnit.SECONDS);
-        } catch(Exception exception) {
+        } catch (Exception exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
         }
 
         HttpResponseHandler responseHandler = initializer.responseHandler();
         final int streamId = 3;
-        final URI hostName = URI.create("https://" + host + ':' + port);
+        final URI hostName = URI.create(scheme + "://" + host + ':' + port);
 
         // Set attributes to SampleResult
         try {
-            sampleResult.setURL(new URL(hostName.toString()));
+            sampleResult.setURL(hostName.toURL());
         } catch (MalformedURLException exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
         }
 
-        FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, GET, path);
+        String requestPath = (path.startsWith("/")) ? hostName.toString() + path : path;
+
+        FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, new HttpMethod(method), requestPath);
         request.headers().add(HttpHeaderNames.HOST, hostName);
 
         // Add request headers set by HeaderManager
@@ -128,18 +134,18 @@ public class NettyHttp2Client {
                 PropertyIterator i = headers.iterator();
                 while (i.hasNext()) {
                     org.apache.jmeter.protocol.http.control.Header header
-                        = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
+                            = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
                     request.headers().add(header.getName(), header.getValue());
                 }
             }
         }
 
-        channel.writeAndFlush(request);
         responseHandler.put(streamId, channel.newPromise());
+        channel.writeAndFlush(request);
 
         final SortedMap<Integer, FullHttpResponse> responseMap;
         try {
-            responseMap = responseHandler.awaitResponses(5, TimeUnit.SECONDS);
+            responseMap = responseHandler.awaitResponses(10, TimeUnit.SECONDS);
 
             // Currently pick up only one response of a stream
             final FullHttpResponse response = responseMap.get(streamId);
@@ -148,7 +154,7 @@ public class NettyHttp2Client {
             sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
             sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
             sampleResult.setResponseHeaders(getResponseHeaders(response));
-        } catch(Exception exception) {
+        } catch (Exception exception) {
             sampleResult.setSuccessful(false);
             return sampleResult;
         }
@@ -170,16 +176,16 @@ public class NettyHttp2Client {
 
         try {
             sslCtx = SslContextBuilder.forClient()
-                .sslProvider(provider)
-                .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
-                .trustManager(InsecureTrustManagerFactory.INSTANCE)
-                .applicationProtocolConfig(new ApplicationProtocolConfig(
-                    Protocol.ALPN,
-                    SelectorFailureBehavior.NO_ADVERTISE,
-                    SelectedListenerFailureBehavior.ACCEPT,
-                    ApplicationProtocolNames.HTTP_2))
-                .build();
-        } catch(SSLException exception) {
+                    .sslProvider(provider)
+                    .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                    .applicationProtocolConfig(new ApplicationProtocolConfig(
+                            Protocol.ALPN,
+                            SelectorFailureBehavior.NO_ADVERTISE,
+                            SelectedListenerFailureBehavior.ACCEPT,
+                            ApplicationProtocolNames.HTTP_2))
+                    .build();
+        } catch (SSLException exception) {
             return null;
         }
 
@@ -193,7 +199,7 @@ public class NettyHttp2Client {
         StringBuilder headerBuf = new StringBuilder();
 
         Iterator<Entry<String, String>> iterator = response.headers().iteratorAsString();
-        while(iterator.hasNext()) {
+        while (iterator.hasNext()) {
             Entry<String, String> entry = iterator.next();
             headerBuf.append(entry.getKey());
             headerBuf.append(": ");
