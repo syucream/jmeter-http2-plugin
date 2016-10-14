@@ -87,84 +87,88 @@ public class NettyHttp2Client {
 
         // Configure the client.
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        Http2ClientInitializer initializer = new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE);
-        Bootstrap b = new Bootstrap();
-        b.group(workerGroup);
-        b.channel(NioSocketChannel.class);
-        b.option(ChannelOption.SO_KEEPALIVE, true);
-        b.remoteAddress(host, port);
-        b.handler(initializer);
-
-        // Start sampling
-        sampleResult.sampleStart();
-
-        // Start the client.
-        Channel channel = b.connect().syncUninterruptibly().channel();
-
-        // Wait for the HTTP/2 upgrade to occur.
-        Http2SettingsHandler http2SettingsHandler = initializer.settingsHandler();
         try {
-            http2SettingsHandler.awaitSettings(5, TimeUnit.SECONDS);
-        } catch (Exception exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
+            Http2ClientInitializer initializer = new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE);
+            Bootstrap b = new Bootstrap();
+            b.group(workerGroup);
+            b.channel(NioSocketChannel.class);
+            b.option(ChannelOption.SO_KEEPALIVE, true);
+            b.remoteAddress(host, port);
+            b.handler(initializer);
 
-        HttpResponseHandler responseHandler = initializer.responseHandler();
-        final int streamId = 3;
-        final URI hostName = URI.create(scheme + "://" + host + ':' + port);
+            // Start sampling
+            sampleResult.sampleStart();
 
-        // Set attributes to SampleResult
-        try {
-            sampleResult.setURL(hostName.toURL());
-        } catch (MalformedURLException exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
+            // Start the client.
+            Channel channel = b.connect().syncUninterruptibly().channel();
 
-        String requestPath = (path.startsWith("/")) ? hostName.toString() + path : path;
+            // Wait for the HTTP/2 upgrade to occur.
+            Http2SettingsHandler http2SettingsHandler = initializer.settingsHandler();
+            try {
+                http2SettingsHandler.awaitSettings(5, TimeUnit.SECONDS);
+            } catch (Exception exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
 
-        FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, new HttpMethod(method), requestPath);
-        request.headers().add(HttpHeaderNames.HOST, hostName);
+            HttpResponseHandler responseHandler = initializer.responseHandler();
+            final int streamId = 3;
+            final URI hostName = URI.create(scheme + "://" + host + ':' + port);
 
-        // Add request headers set by HeaderManager
-        if (headerManager != null) {
-            CollectionProperty headers = headerManager.getHeaders();
-            if (headers != null) {
-                PropertyIterator i = headers.iterator();
-                while (i.hasNext()) {
-                    org.apache.jmeter.protocol.http.control.Header header
-                            = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
-                    request.headers().add(header.getName(), header.getValue());
+            // Set attributes to SampleResult
+            try {
+                sampleResult.setURL(hostName.toURL());
+            } catch (MalformedURLException exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
+
+            String requestPath = (path.startsWith("/")) ? hostName.toString() + path : path;
+
+            FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, new HttpMethod(method), requestPath);
+            request.headers().add(HttpHeaderNames.HOST, hostName);
+
+            // Add request headers set by HeaderManager
+            if (headerManager != null) {
+                CollectionProperty headers = headerManager.getHeaders();
+                if (headers != null) {
+                    PropertyIterator i = headers.iterator();
+                    while (i.hasNext()) {
+                        org.apache.jmeter.protocol.http.control.Header header
+                                = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
+                        request.headers().add(header.getName(), header.getValue());
+                    }
                 }
             }
+
+            responseHandler.put(streamId, channel.newPromise());
+            channel.writeAndFlush(request);
+
+            final SortedMap<Integer, FullHttpResponse> responseMap;
+            try {
+                responseMap = responseHandler.awaitResponses(10, TimeUnit.SECONDS);
+
+                // Currently pick up only one response of a stream
+                final FullHttpResponse response = responseMap.get(streamId);
+                final AsciiString responseCode = response.status().codeAsText();
+                final String reasonPhrase = response.status().reasonPhrase();
+                sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
+                sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
+                sampleResult.setResponseHeaders(getResponseHeaders(response));
+            } catch (Exception exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
+
+            // Wait until the connection is closed.
+            channel.close().syncUninterruptibly();
+
+            // End sampling
+            sampleResult.sampleEnd();
+            sampleResult.setSuccessful(true);
+        } finally {
+            workerGroup.shutdownGracefully();
         }
-
-        responseHandler.put(streamId, channel.newPromise());
-        channel.writeAndFlush(request);
-
-        final SortedMap<Integer, FullHttpResponse> responseMap;
-        try {
-            responseMap = responseHandler.awaitResponses(10, TimeUnit.SECONDS);
-
-            // Currently pick up only one response of a stream
-            final FullHttpResponse response = responseMap.get(streamId);
-            final AsciiString responseCode = response.status().codeAsText();
-            final String reasonPhrase = response.status().reasonPhrase();
-            sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
-            sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
-            sampleResult.setResponseHeaders(getResponseHeaders(response));
-        } catch (Exception exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
-
-        // Wait until the connection is closed.
-        channel.close().syncUninterruptibly();
-
-        // End sampling
-        sampleResult.sampleEnd();
-        sampleResult.setSuccessful(true);
 
         return sampleResult;
     }
