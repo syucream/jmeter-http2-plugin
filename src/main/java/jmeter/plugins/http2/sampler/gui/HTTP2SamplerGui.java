@@ -78,7 +78,7 @@ public class HTTP2SamplerGui extends AbstractSamplerGui {
         /* method.setText(sampler.getMethod()); */
         scheme.setText(sampler.getScheme());
         domain.setText(sampler.getDomain());
-        port.setText(String.valueOf(sampler.getPort()));
+        port.setText(sampler.getPortAsString());
         path.setText(sampler.getPath());
     }
 

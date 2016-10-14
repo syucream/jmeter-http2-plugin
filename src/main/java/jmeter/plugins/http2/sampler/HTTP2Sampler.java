@@ -115,6 +115,10 @@ public class HTTP2Sampler extends AbstractSampler {
       return getPropertyAsInt(PORT);
     }
 
+    public String getPortAsString() {
+        return getPropertyAsString(PORT);
+    }
+
     public void setPath(String value) {
       setProperty(PATH, value);
     }
