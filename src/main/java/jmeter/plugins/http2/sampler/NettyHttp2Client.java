@@ -15,25 +15,7 @@
  */
 package jmeter.plugins.http2.sampler;
 
-import java.net.URI;
-import java.net.URL;
-import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
-import java.util.SortedMap;
-import java.util.Iterator;
-import java.util.Map.Entry;
-
-import javax.net.ssl.SSLException;
-
-import org.apache.jmeter.protocol.http.control.Header;
-import org.apache.jmeter.protocol.http.control.HeaderManager;
-import org.apache.jmeter.samplers.SampleResult;
-import org.apache.jmeter.testelement.property.CollectionProperty;
-import org.apache.jmeter.testelement.property.PropertyIterator;
-
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -43,10 +25,8 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.util.AsciiString;
-
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
 import io.netty.handler.ssl.ApplicationProtocolConfig.SelectedListenerFailureBehavior;
@@ -58,12 +38,25 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.util.AsciiString;
+import org.apache.jmeter.protocol.http.control.HeaderManager;
+import org.apache.jmeter.samplers.SampleResult;
+import org.apache.jmeter.testelement.property.CollectionProperty;
+import org.apache.jmeter.testelement.property.PropertyIterator;
 
-import static io.netty.handler.codec.http.HttpMethod.*;
-import static io.netty.handler.codec.http.HttpVersion.*;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.SortedMap;
+import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLException;
+
+import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class NettyHttp2Client {
     private final String method;
+    private final String scheme;
     private final String host;
     private final int port;
     private final String path;
@@ -71,101 +64,111 @@ public class NettyHttp2Client {
 
     private Bootstrap b;
 
-    public NettyHttp2Client(String method, String host, int port, String path, HeaderManager headerManager) {
+    public NettyHttp2Client(String method, String host, int port, String path, HeaderManager headerManager, String scheme) {
         this.method = method;
         this.host = host;
         this.port = port;
         this.path = path;
         this.headerManager = headerManager;
+        this.scheme = scheme;
     }
 
     public SampleResult request() {
         SampleResult sampleResult = new SampleResult();
 
-        final SslContext sslCtx = getSslContext();
-        if (sslCtx == null) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
+        SslContext sslCtx = null;
+        if ("https".equals(scheme)) {
+            sslCtx = getSslContext();
+            if (sslCtx == null) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
         }
 
         // Configure the client.
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        Http2ClientInitializer initializer = new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE);
-        Bootstrap b = new Bootstrap();
-        b.group(workerGroup);
-        b.channel(NioSocketChannel.class);
-        b.option(ChannelOption.SO_KEEPALIVE, true);
-        b.remoteAddress(host, port);
-        b.handler(initializer);
-
-        // Start sampling
-        sampleResult.sampleStart();
-
-        // Start the client.
-        Channel channel = b.connect().syncUninterruptibly().channel();
-
-        // Wait for the HTTP/2 upgrade to occur.
-        Http2SettingsHandler http2SettingsHandler = initializer.settingsHandler();
         try {
-            http2SettingsHandler.awaitSettings(5, TimeUnit.SECONDS);
-        } catch(Exception exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
+            Http2ClientInitializer initializer = new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE);
+            Bootstrap b = new Bootstrap();
+            b.group(workerGroup);
+            b.channel(NioSocketChannel.class);
+            b.option(ChannelOption.SO_KEEPALIVE, true);
+            b.remoteAddress(host, port);
+            b.handler(initializer);
 
-        HttpResponseHandler responseHandler = initializer.responseHandler();
-        final int streamId = 3;
-        final URI hostName = URI.create("https://" + host + ':' + port);
+            // Start sampling
+            sampleResult.sampleStart();
 
-        // Set attributes to SampleResult
-        try {
-            sampleResult.setURL(new URL(hostName.toString()));
-        } catch (MalformedURLException exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
+            // Start the client.
+            Channel channel = b.connect().syncUninterruptibly().channel();
 
-        FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, GET, path);
-        request.headers().addObject(HttpHeaderNames.HOST, hostName);
+            // Wait for the HTTP/2 upgrade to occur.
+            Http2SettingsHandler http2SettingsHandler = initializer.settingsHandler();
+            try {
+                http2SettingsHandler.awaitSettings(5, TimeUnit.SECONDS);
+            } catch (Exception exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
 
-        // Add request headers set by HeaderManager
-        if (headerManager != null) {
-            CollectionProperty headers = headerManager.getHeaders();
-            if (headers != null) {
-                PropertyIterator i = headers.iterator();
-                while (i.hasNext()) {
-                    org.apache.jmeter.protocol.http.control.Header header
-                        = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
-                    request.headers().add(header.getName(), header.getValue());
+            HttpResponseHandler responseHandler = initializer.responseHandler();
+            final int streamId = 3;
+            final URI hostName = URI.create(scheme + "://" + host + ':' + port);
+
+            // Set attributes to SampleResult
+            try {
+                sampleResult.setURL(hostName.toURL());
+            } catch (MalformedURLException exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
+
+            String requestPath = (path.startsWith("/")) ? hostName.toString() + path : path;
+
+            FullHttpRequest request = new DefaultFullHttpRequest(HTTP_1_1, new HttpMethod(method), requestPath);
+            request.headers().add(HttpHeaderNames.HOST, hostName);
+
+            // Add request headers set by HeaderManager
+            if (headerManager != null) {
+                CollectionProperty headers = headerManager.getHeaders();
+                if (headers != null) {
+                    PropertyIterator i = headers.iterator();
+                    while (i.hasNext()) {
+                        org.apache.jmeter.protocol.http.control.Header header
+                                = (org.apache.jmeter.protocol.http.control.Header) i.next().getObjectValue();
+                        request.headers().add(header.getName(), header.getValue());
+                    }
                 }
             }
+
+            responseHandler.put(streamId, channel.newPromise());
+            channel.writeAndFlush(request);
+
+            final SortedMap<Integer, FullHttpResponse> responseMap;
+            try {
+                responseMap = responseHandler.awaitResponses(10, TimeUnit.SECONDS);
+
+                // Currently pick up only one response of a stream
+                final FullHttpResponse response = responseMap.get(streamId);
+                final AsciiString responseCode = response.status().codeAsText();
+                final String reasonPhrase = response.status().reasonPhrase();
+                sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
+                sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
+                sampleResult.setResponseHeaders(getResponseHeaders(response));
+            } catch (Exception exception) {
+                sampleResult.setSuccessful(false);
+                return sampleResult;
+            }
+
+            // Wait until the connection is closed.
+            channel.close().syncUninterruptibly();
+
+            // End sampling
+            sampleResult.sampleEnd();
+            sampleResult.setSuccessful(true);
+        } finally {
+            workerGroup.shutdownGracefully();
         }
-
-        channel.writeAndFlush(request);
-        responseHandler.put(streamId, channel.newPromise());
-
-        final SortedMap<Integer, FullHttpResponse> responseMap;
-        try {
-            responseMap = responseHandler.awaitResponses(5, TimeUnit.SECONDS);
-
-            // Currently pick up only one response of a stream
-            final FullHttpResponse response = responseMap.get(streamId);
-            final AsciiString responseCode = response.status().codeAsText();
-            final AsciiString reasonPhrase = response.status().reasonPhrase();
-            sampleResult.setResponseCode(new StringBuilder(responseCode.length()).append(responseCode).toString());
-            sampleResult.setResponseMessage(new StringBuilder(reasonPhrase.length()).append(reasonPhrase).toString());
-            sampleResult.setResponseHeaders(getResponseHeaders(response));
-        } catch(Exception exception) {
-            sampleResult.setSuccessful(false);
-            return sampleResult;
-        }
-
-        // Wait until the connection is closed.
-        channel.close().syncUninterruptibly();
-
-        // End sampling
-        sampleResult.sampleEnd();
-        sampleResult.setSuccessful(true);
 
         return sampleResult;
     }
@@ -177,16 +180,16 @@ public class NettyHttp2Client {
 
         try {
             sslCtx = SslContextBuilder.forClient()
-                .sslProvider(provider)
-                .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
-                .trustManager(InsecureTrustManagerFactory.INSTANCE)
-                .applicationProtocolConfig(new ApplicationProtocolConfig(
-                    Protocol.ALPN,
-                    SelectorFailureBehavior.NO_ADVERTISE,
-                    SelectedListenerFailureBehavior.ACCEPT,
-                    ApplicationProtocolNames.HTTP_2))
-                .build();
-        } catch(SSLException exception) {
+                    .sslProvider(provider)
+                    .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                    .applicationProtocolConfig(new ApplicationProtocolConfig(
+                            Protocol.ALPN,
+                            SelectorFailureBehavior.NO_ADVERTISE,
+                            SelectedListenerFailureBehavior.ACCEPT,
+                            ApplicationProtocolNames.HTTP_2))
+                    .build();
+        } catch (SSLException exception) {
             return null;
         }
 
@@ -199,8 +202,8 @@ public class NettyHttp2Client {
     private String getResponseHeaders(FullHttpResponse response) {
         StringBuilder headerBuf = new StringBuilder();
 
-        Iterator<Entry<String, String>> iterator = response.headers().iteratorConverted();
-        while(iterator.hasNext()) {
+        Iterator<Entry<String, String>> iterator = response.headers().iteratorAsString();
+        while (iterator.hasNext()) {
             Entry<String, String> entry = iterator.next();
             headerBuf.append(entry.getKey());
             headerBuf.append(": ");

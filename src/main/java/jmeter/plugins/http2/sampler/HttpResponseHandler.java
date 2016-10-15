@@ -23,7 +23,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http2.HttpUtil;
+import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.CharsetUtil;
 
 import java.util.Iterator;
@@ -84,8 +84,8 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
     }
 
     @Override
-    protected void messageReceived(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
-        Integer streamId = msg.headers().getInt(HttpUtil.ExtensionHeaderNames.STREAM_ID.text());
+    protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+        Integer streamId = msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text());
         if (streamId == null) {
             System.err.println("HttpResponseHandler unexpected message received: " + msg);
             return;
@@ -101,13 +101,15 @@ public class HttpResponseHandler extends SimpleChannelInboundHandler<FullHttpRes
                 int contentLength = content.readableBytes();
                 byte[] arr = new byte[contentLength];
                 content.readBytes(arr);
+                //noinspection Since15
                 System.out.println(new String(arr, 0, contentLength, CharsetUtil.UTF_8));
             }
 
-            promise.setSuccess();
-
             // Set result
             streamidResponseMap.put(streamId, msg);
+
+            promise.setSuccess();
+
         }
     }
 }

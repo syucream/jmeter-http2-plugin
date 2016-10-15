@@ -18,11 +18,9 @@
  */
 package jmeter.plugins.http2.sampler;
 
-import static io.netty.handler.logging.LogLevel.INFO;
-
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
@@ -45,9 +43,11 @@ import io.netty.handler.codec.http2.Http2FrameWriter;
 import io.netty.handler.codec.http2.Http2InboundFrameLogger;
 import io.netty.handler.codec.http2.Http2OutboundFrameLogger;
 import io.netty.handler.codec.http2.Http2Settings;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
-import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapter;
+import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
+import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
 import io.netty.handler.ssl.SslContext;
+
+import static io.netty.handler.logging.LogLevel.INFO;
 
 /**
  * Configures the client pipeline to support HTTP/2 frames.
@@ -71,14 +71,37 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     public void initChannel(SocketChannel ch) throws Exception {
         final Http2Connection connection = new DefaultHttp2Connection(false);
 
-        connectionHandler = new HttpToHttp2ConnectionHandler(connection,
-                frameReader(),
-                frameWriter(),
-                new DelegatingDecompressorFrameListener(connection,
-                        new InboundHttp2ToHttpAdapter.Builder(connection)
+//        Http2ConnectionEncoder encoder = new DefaultHttp2ConnectionEncoder(connection, frameWriter());
+//        encoder = new StreamBufferingEncoder(encoder, 100);
+//        Http2ConnectionDecoder decoder = new DefaultHttp2ConnectionDecoder(connection, encoder, frameReader());
+
+        connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
+//                .codec(decoder, encoder)
+                .frameListener(new DelegatingDecompressorFrameListener(connection,
+                        new InboundHttp2ToHttpAdapterBuilder(connection)
                                 .maxContentLength(maxContentLength)
                                 .propagateSettings(true)
-                                .build()));
+                                .build()))
+                .connection(connection)
+                .build();
+
+
+//        // Set initial SETTINGS
+//        Http2Settings settings = new Http2Settings();
+//        settings.pushEnabled(false);
+//        settings.maxConcurrentStreams(100);
+//
+//        connectionHandler = new HttpToHttp2ConnectionHandler.Builder()
+//                .frameLogger(logger)
+//                .initialSettings(settings)
+//                .encoderMaxConcurrentStreams(100)
+//
+//                .frameListener(new DelegatingDecompressorFrameListener(connection,
+//                        new InboundHttp2ToHttpAdapter.Builder(connection)
+//                                .maxContentLength(maxContentLength)
+//                                .propagateSettings(true)
+//                                .build()))
+//                .build(connection);
         responseHandler = new HttpResponseHandler();
         settingsHandler = new Http2SettingsHandler(ch.newPromise());
         if (sslCtx != null) {
@@ -128,14 +151,15 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     /**
      * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
      */
-    private final class UpgradeRequestHandler extends ChannelHandlerAdapter {
+    private final class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
             DefaultFullHttpRequest upgradeRequest =
                     new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+            upgradeRequest.headers().add("Host", "default");
             ctx.writeAndFlush(upgradeRequest);
 
-            super.channelActive(ctx);
+            ctx.fireChannelActive();
 
             // Done with this handler, remove it from the pipeline.
             ctx.pipeline().remove(this);
@@ -147,11 +171,11 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     /**
      * Class that logs any User Events triggered on this channel.
      */
-    private static class UserEventLogger extends ChannelHandlerAdapter {
+    private static class UserEventLogger extends ChannelInboundHandlerAdapter {
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
             System.out.println("User Event Triggered: " + evt);
-            super.userEventTriggered(ctx, evt);
+            ctx.fireUserEventTriggered(evt);
         }
     }
 
